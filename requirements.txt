@@ -1,0 +1,8 @@
+mediapipe
+numpy
+opencv-python
+pillow
+pyfar
+scipy
+sounddevice
+soundfile
