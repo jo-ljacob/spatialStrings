@@ -6,7 +6,7 @@
 
 **Video Demo:** WIP
 
-## Installation:
+## Installation
 
 1. Clone the repository
 
@@ -15,26 +15,26 @@ git clone https://github.com/jo-ljacob/spatialStrings
 cd spatialStrings
 ```
 
-2. Install Git LFS (required for large HRTF file)
+2. Install [Git LFS](https://git-lfs.com/) (required for large HRTF file)
 
 ```bash
 git lfs install
 git lfs pull
 ```
 
-2. Install dependencies
+3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Run the project
+4. Run the project
 
 ```bash
 python main.py
 ```
 
-## Controls:
+## Controls
 
 - Choose an instrument by clicking an icon on the left sidebar
 - Place an instrument by pinching all fingers together

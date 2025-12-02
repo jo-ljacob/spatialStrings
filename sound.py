@@ -198,12 +198,19 @@ class RealtimeConvolver:
             self.block_size,
             self.partition_size
         )
+        # Copy the state to old convolver
         self.old_convolver.fdl_left = self.fdl_left.copy()
         self.old_convolver.fdl_right = self.fdl_right.copy()
         self.old_convolver.overlap_left = self.overlap_left.copy()
         self.old_convolver.overlap_right = self.overlap_right.copy()
         
-        self.__init__(new_ir_left, new_ir_right, self.block_size, self.partition_size)
+        # Reinitialize with new IR (this creates fresh fdl with correct size)
+        old_block_size = self.block_size
+        old_partition_size = self.partition_size
+        self.__init__(new_ir_left, new_ir_right, old_block_size, old_partition_size)
+        
+        # Note: fdl is reset to zeros by __init__, which is fine for smooth transition
+        
         self.crossfade_active = True
         self.crossfade_samples = 0
         
