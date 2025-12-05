@@ -129,10 +129,6 @@ def updateTracking():
         noseTip.normalizeFace()
         noseTip.transform(head)
 
-        earToEarX = rawRightEar.x - rawLeftEar.x
-        earToEarY = rawRightEar.y - rawLeftEar.y
-        earToEarZ = rawRightEar.z - rawLeftEar.z
-
         # Serves as right vector
         rightEar = TrackingPoint(rawRightEar.x, rawRightEar.y, rawRightEar.z)
         rightEar.normalizeFace()
