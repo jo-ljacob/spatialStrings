@@ -4,6 +4,7 @@
 - Hear the instruments with spatial audio that updates in real-time
 - See sprites that visually represent the spatial position of the instruments
 
+**Video Demo:**
 [![Video Demo](https://img.youtube.com/vi/a_usY8hawPc/hqdefault.jpg)](https://www.youtube.com/watch?v=a_usY8hawPc)
 
 ## Installation
@@ -53,7 +54,7 @@ Parts of the code that were outside of my scope were written with the assistance
 
 The HRTF Database used was [The Viking HRTF Database](https://sofacoustics.org/data/database/viking/documentation.pdf).
 
-- Note that this database does not cover points under an elevation of -45 degrees, and so instruments placed under that threshold will not be accurate
+- Note that this database does not cover points under an elevation of -45 degrees, and so instruments placed under that threshold will not be accurate.
 
 Instrument sounds were created using [GarageBand](https://apps.apple.com/us/app/garageband/id408709785) Smart Strings.
 
