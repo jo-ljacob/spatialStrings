@@ -4,7 +4,7 @@ from PIL import Image, ImageTk
 import cv2
 import globals
 import os
-from sound import spawnRandomInstruments
+from sound import commit, spawnRandomInstruments
 
 class GUI:
     def __init__(self, root):
@@ -55,20 +55,27 @@ class GUI:
                   command=self.popLast, 
                   **btnStyle).pack(side='left', padx=5, pady=10)
         
+        tk.Button(controlFrame, text="Undo", 
+                  command=self.undo, 
+                  **btnStyle).pack(side='left', padx=(20,5), pady=10)
+        tk.Button(controlFrame, text="Redo", 
+                  command=self.redo, 
+                  **btnStyle).pack(side='left', padx=5, pady=10)
+        
         self.placementVar = tk.BooleanVar(value=True)
         tk.Checkbutton(controlFrame, text="Placement", variable=self.placementVar, 
                       command=self.togglePlacement,
                       font=('Times New Roman', 12), 
-                      bg='#eeeeff').pack(side='left', padx=15)
+                      bg='#eeeeff').pack(side='left', padx=(15,10))
         
         tk.Label(controlFrame, text="Volume:", 
                  bg='#eeeeff', 
-                 font=('Times New Roman', 12)).pack(side='left', padx=(40, 5))
+                 font=('Times New Roman', 12)).pack(side='left', padx=(10, 5))
         self.volumeSlider = tk.Scale(controlFrame, from_=0, to=100, orient=tk.HORIZONTAL,
-                                     command=self.onVolumeChange, length=250,
+                                     command=self.onVolumeChange, length=190,
                                      bg='#eeeeff', highlightthickness=0, showvalue=False)
         self.volumeSlider.set(int(globals.volume * 100))
-        self.volumeSlider.pack(side='left', padx=5, pady=0)
+        self.volumeSlider.pack(side='left')
         
         tk.Button(controlFrame, text="Random", command=spawnRandomInstruments, **btnStyle).pack(side='right', padx=12, pady=10)
         
@@ -100,7 +107,7 @@ class GUI:
         sidebarFrame.pack_propagate(False)
         
         # Instrument list
-        self.instrumentsFrame = tk.Frame(sidebarFrame, bg='white')
+        self.instrumentsFrame = tk.Frame(sidebarFrame, bg='#eeeeff')
         self.instrumentsFrame.pack(side='left', fill='both', expand=True)
         
         self.createInstrumentButtons(self.instrumentsFrame)
@@ -134,7 +141,7 @@ class GUI:
             name = instrumentList[i]
             imagePath = os.path.join(globals.IMAGES_DIR, f"{name}.png")
             
-            bgColor = '#e0e0e0'  # Default unselected
+            bgColor = '#e0e0e0'
             
             containerFrame = tk.Frame(parent, bg=bgColor, height=125)
             containerFrame.pack(fill='x')
@@ -201,17 +208,32 @@ class GUI:
                 btn['btnFrame'].config(bg='#e0e0e0')
                 btn['imageLabel'].config(bg='#e0e0e0')
                 btn['nameLabel'].config(bg='#e0e0e0')
-    
-    def togglePlacement(self):
-        globals.isPlacingOn = self.placementVar.get()
-    
+
     def clearInstruments(self):
-        globals.instrumentsPlaying = []
-        globals.playbackPosition = 0
+        if globals.instrumentsPlaying:
+            commit()
+            globals.instrumentsPlaying.clear()
+            globals.playbackPosition = 0
         
     def popLast(self):
         if globals.instrumentsPlaying:
+            commit()
             globals.instrumentsPlaying.pop()
+            
+    def undo(self):
+        if globals.undoStack:
+            globals.redoStack.append([inst for inst in globals.instrumentsPlaying])
+            prev = globals.undoStack.pop()
+            globals.instrumentsPlaying = [inst for inst in prev]
+            
+    def redo(self):
+        if globals.redoStack:
+            globals.undoStack.append([inst for inst in globals.instrumentsPlaying])
+            next = globals.redoStack.pop()
+            globals.instrumentsPlaying = [inst for inst in next]
+            
+    def togglePlacement(self):
+        globals.isPlacingOn = self.placementVar.get()
 
     def onVolumeChange(self, value):
         globals.volume = float(value) / 100

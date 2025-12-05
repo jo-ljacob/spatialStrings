@@ -7,7 +7,7 @@ SOUNDS_DIR = "./sounds"
 IMAGES_DIR = "./images"
 HRTF_UPDATE_THRESHOLD_RADIAN = 0.1
 MIN_DISTANCE = 0.25
-VOL_CAP = 0.1
+VOL_CAP = 0.2
 WINDOW_WIDTH = 805
 WINDOW_HEIGHT = 670
 
@@ -20,9 +20,11 @@ isPlacingOn = True
 isHandVisible = False
 areFingersTouching = False
 wereFingersTouching = False
-hrtf, sofa = pf.io.read_sofa('Kemar_HRTF_sofa.sofa', verify=False)[:2]
+hrtf, sofa = pf.io.read_sofa('vikingHRTF.sofa', verify=False)[:2]
 instruments = []
 instrumentsPlaying = []
+undoStack = []
+redoStack = []
 currentInstrument = None
 playbackPosition = 0
 stream = None

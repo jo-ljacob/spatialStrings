@@ -53,25 +53,25 @@ class TrackingPoint:
         point = np.array([self.x, self.y, self.z], dtype=float)
         forward = np.array([forward.x, forward.y, forward.z], dtype=float)
         right = np.array([right.x, right.y, right.z], dtype=float)
-        
-        forward = np.array(forward, dtype=float)
+
         forward /= np.linalg.norm(forward)
-        
-        right = np.array(right, dtype=float)
-        right -= np.dot(right, forward) * forward  # Make orthogonal
+
+        right -= np.dot(right, forward) * forward
         right /= np.linalg.norm(right)
 
         up = np.cross(forward, right)
-        
+
         rotationMatrix = np.array([right, up, forward])
-        
-        pointRotated = rotationMatrix @ point
-        x, y, z = pointRotated
-        
-        self.rho = np.linalg.norm(pointRotated)
-        self.theta = np.arctan2(-x, -z)
-        self.phi = -np.arcsin(y / self.rho)
-        
+        x, y, z = rotationMatrix @ point
+
+        self.rho = np.linalg.norm([x, y, z])
+        self.theta = np.arctan2(x, -z) % (2 * np.pi)
+        self.phi = -np.arctan2(y, np.sqrt(x**2 + z**2))
+            
+        # Clamp phi to -45 degrees if it goes below that threshold
+        if self.phi < -np.pi / 5:
+            self.phi = -np.pi / 5
+
 def distance(p1, p2):
     return ((p2.x-p1.x)**2+(p2.y-p1.y)**2)**0.5
 
@@ -79,7 +79,7 @@ def areFingersTouching(fingers, scale):
     landmarks = list(fingers.values())
     for i in range(len(landmarks)):
         for j in range(i + 1, len(landmarks)):
-            if distance(landmarks[i], landmarks[j]) > scale * 0.45:
+            if distance(landmarks[i], landmarks[j]) > scale * 0.5:
                 return False
     return True
 
@@ -128,6 +128,10 @@ def updateTracking():
         noseTip = TrackingPoint(rawNoseTip.x, rawNoseTip.y, rawNoseTip.z)
         noseTip.normalizeFace()
         noseTip.transform(head)
+
+        earToEarX = rawRightEar.x - rawLeftEar.x
+        earToEarY = rawRightEar.y - rawLeftEar.y
+        earToEarZ = rawRightEar.z - rawLeftEar.z
 
         # Serves as right vector
         rightEar = TrackingPoint(rawRightEar.x, rawRightEar.y, rawRightEar.z)

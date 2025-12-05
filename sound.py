@@ -55,18 +55,17 @@ class Instrument():
         
     def cacheAudio(self):
         wav, wavSampleRate = sf.read(self.wav)
-        wav = np.mean(wav, axis=1) # Make audio mono
         if wavSampleRate != globals.hrtf.sampling_rate:
             numSamples = int(len(wav) * globals.hrtf.sampling_rate / wavSampleRate)
             wav = resample(wav, numSamples)
         self.cachedAudio = wav
 
     def getHRTF(self):
-        hrtf_coords_sph = globals.sofa.get_sph()
+        hrtfCoords = globals.sofa.get_sph()
         
         # Find the closest point to the ideal coordinates in the HRTF file
-        distances = ((hrtf_coords_sph[:, 0] - self.theta)**2 + 
-                    (hrtf_coords_sph[:, 1] - self.phi)**2)**0.5
+        distances = ((hrtfCoords[:, 0] - self.theta)**2 + 
+                    (hrtfCoords[:, 1] - self.phi)**2)**0.5
         
         nearest = np.argmin(distances)
         
@@ -92,31 +91,36 @@ class Instrument():
         point = np.array([self.x, self.y, self.z], dtype=float)
         forward = np.array([forward.x, forward.y, forward.z], dtype=float)
         right = np.array([right.x, right.y, right.z], dtype=float)
-        
-        forward = np.array(forward, dtype=float)
+
         forward /= np.linalg.norm(forward)
-        
-        right = np.array(right, dtype=float)
-        right -= np.dot(right, forward) * forward  # Make orthogonal
+
+        right -= np.dot(right, forward) * forward
         right /= np.linalg.norm(right)
 
         up = np.cross(forward, right)
-        
-        rotationMatrix = np.array([right, up, forward])
-        pointRotated = rotationMatrix @ point
-        x, y, z = pointRotated
 
-        self.rho = np.linalg.norm(pointRotated)
-        self.theta = np.arctan2(-x, -z)
-        self.phi = -np.arcsin(y / self.rho)
+        rotationMatrix = np.array([right, up, forward])
+        x, y, z = rotationMatrix @ point
+
+        self.rho = np.linalg.norm([x, y, z])
+        self.theta = np.arctan2(x, -z) % (2 * np.pi)
+        self.phi = -np.arctan2(y, np.sqrt(x**2 + z**2))
+            
+        # Clamp phi to -45 degrees if it goes below that threshold
+        if self.phi < -np.pi / 5:
+            self.phi = -np.pi / 5
 
 class RealtimeConvolver:
     # Taken from AI to achieve FFT convolution
+    """
+    Partitioned overlap-add convolver for real-time HRTF processing.
+    Based on uniformly partitioned convolution algorithm.
+    """
     def __init__(self, ir_left, ir_right, block_size=512, partition_size=128):
         self.block_size = block_size
         self.partition_size = partition_size
         
-        # Pad IRs to multiple of partition size
+        # CRITICAL FIX #1: Pad IRs to multiple of partition size
         ir_len = len(ir_left)
         num_partitions = int(np.ceil(ir_len / partition_size))
         padded_len = num_partitions * partition_size
@@ -126,20 +130,26 @@ class RealtimeConvolver:
         
         # Pre-compute FFT of IR partitions
         self.num_partitions = num_partitions
-        fft_size = partition_size * 2
+        fft_size = partition_size * 2  # Must be 2x for linear convolution
         
         self.ir_left_fft = []
         self.ir_right_fft = []
         
+        # CRITICAL FIX #2: Zero-pad each partition before FFT
         for i in range(num_partitions):
             start = i * partition_size
             end = start + partition_size
-            self.ir_left_fft.append(np.fft.rfft(self.ir_left[start:end], fft_size))
-            self.ir_right_fft.append(np.fft.rfft(self.ir_right[start:end], fft_size))
+            # Zero-pad to fft_size for proper linear convolution
+            left_partition = np.pad(self.ir_left[start:end], (0, partition_size))
+            right_partition = np.pad(self.ir_right[start:end], (0, partition_size))
+            self.ir_left_fft.append(np.fft.rfft(left_partition, fft_size))
+            self.ir_right_fft.append(np.fft.rfft(right_partition, fft_size))
         
-        # Overlap-add buffers
+        # Frequency-domain delay lines (FDL)
         self.fdl_left = [np.zeros(fft_size // 2 + 1, dtype=complex) for _ in range(num_partitions)]
         self.fdl_right = [np.zeros(fft_size // 2 + 1, dtype=complex) for _ in range(num_partitions)]
+        
+        # Overlap-add buffers
         self.overlap_left = np.zeros(partition_size)
         self.overlap_right = np.zeros(partition_size)
         
@@ -151,23 +161,33 @@ class RealtimeConvolver:
         
     def process(self, input_block):
         """Process one block using partitioned convolution"""
-        # Process in chunks of partition_size
-        num_chunks = len(input_block) // self.partition_size
+        # CRITICAL FIX #3: Handle block_size != partition_size properly
         output_left = np.zeros(len(input_block))
         output_right = np.zeros(len(input_block))
         
+        # Process in chunks of partition_size
+        num_chunks = int(np.ceil(len(input_block) / self.partition_size))
+        
         for chunk_idx in range(num_chunks):
             start = chunk_idx * self.partition_size
-            end = start + self.partition_size
+            end = min(start + self.partition_size, len(input_block))
             chunk = input_block[start:end]
             
-            # FFT of input
-            fft_size = self.partition_size * 2
-            chunk_fft = np.fft.rfft(chunk, fft_size)
+            # CRITICAL FIX #4: Always use full partition_size (zero-pad if needed)
+            if len(chunk) < self.partition_size:
+                chunk = np.pad(chunk, (0, self.partition_size - len(chunk)))
             
-            # Shift FDL (frequency domain delay line)
-            self.fdl_left = [chunk_fft] + self.fdl_left[:-1]
-            self.fdl_right = [chunk_fft] + self.fdl_right[:-1]
+            fft_size = self.partition_size * 2
+            
+            # Zero-pad input chunk before FFT
+            chunk_padded = np.pad(chunk, (0, self.partition_size))
+            chunk_fft = np.fft.rfft(chunk_padded, fft_size)
+            
+            # CRITICAL FIX #5: Shift FDL correctly (newest at index 0)
+            self.fdl_left.insert(0, chunk_fft)
+            self.fdl_left.pop()
+            self.fdl_right.insert(0, chunk_fft)
+            self.fdl_right.pop()
             
             # Multiply and accumulate
             acc_left = np.zeros(fft_size // 2 + 1, dtype=complex)
@@ -178,43 +198,53 @@ class RealtimeConvolver:
                 acc_right += self.fdl_right[i] * self.ir_right_fft[i]
             
             # IFFT
-            out_left = np.fft.irfft(acc_left)
-            out_right = np.fft.irfft(acc_right)
+            out_left = np.fft.irfft(acc_left, fft_size)
+            out_right = np.fft.irfft(acc_right, fft_size)
             
-            # Overlap-add
-            output_left[start:end] = out_left[:self.partition_size] + self.overlap_left
-            output_right[start:end] = out_right[:self.partition_size] + self.overlap_right
+            # CRITICAL FIX #6: Overlap-add - first partition_size samples + overlap
+            out_chunk_left = out_left[:self.partition_size] + self.overlap_left
+            out_chunk_right = out_right[:self.partition_size] + self.overlap_right
             
-            self.overlap_left = out_left[self.partition_size:]
-            self.overlap_right = out_right[self.partition_size:]
+            # Store second half as overlap for next iteration
+            self.overlap_left = out_left[self.partition_size:fft_size]
+            self.overlap_right = out_right[self.partition_size:fft_size]
+            
+            # Copy to output (handle partial last chunk)
+            out_len = min(self.partition_size, len(input_block) - start)
+            output_left[start:start + out_len] = out_chunk_left[:out_len]
+            output_right[start:start + out_len] = out_chunk_right[:out_len]
         
         return output_left, output_right
     
     def update_ir(self, new_ir_left, new_ir_right):
         """Update HRTF with crossfade"""
+        # Save old convolver state for crossfading
         self.old_convolver = RealtimeConvolver(
             self.ir_left[:len(new_ir_left)], 
             self.ir_right[:len(new_ir_right)],
             self.block_size,
             self.partition_size
         )
-        # Copy the state to old convolver
-        self.old_convolver.fdl_left = self.fdl_left.copy()
-        self.old_convolver.fdl_right = self.fdl_right.copy()
+        # CRITICAL FIX #7: Deep copy state to old convolver
+        self.old_convolver.fdl_left = [fdl.copy() for fdl in self.fdl_left]
+        self.old_convolver.fdl_right = [fdl.copy() for fdl in self.fdl_right]
         self.old_convolver.overlap_left = self.overlap_left.copy()
         self.old_convolver.overlap_right = self.overlap_right.copy()
         
-        # Reinitialize with new IR (this creates fresh fdl with correct size)
+        # Reinitialize with new IR
         old_block_size = self.block_size
         old_partition_size = self.partition_size
         self.__init__(new_ir_left, new_ir_right, old_block_size, old_partition_size)
         
-        # Note: fdl is reset to zeros by __init__, which is fine for smooth transition
-        
         self.crossfade_active = True
         self.crossfade_samples = 0
-        
+
+def commit():
+    globals.undoStack.append([inst for inst in globals.instrumentsPlaying])
+    globals.redoStack.clear()
+
 def spawnRandomInstruments():
+    commit()
     globals.instrumentsPlaying = []
 
     head = globals.trackingPositions[0]
@@ -275,6 +305,7 @@ def updateSources():
             newInstrument.inherit(fingers[8])
             newInstrument.cacheAudio()
             newInstrument.initializeConvolver()
+            commit()
             globals.instrumentsPlaying.append(newInstrument)
             globals.wereFingersTouching = True
         
@@ -309,9 +340,9 @@ def audioCallback(outdata, frames, time, status):
                 instrument.cachedAudio[startPos:], 
                 instrument.cachedAudio[:endPos - audioLength]])
         
-        # Gain usually proportional to just 1/distance, but wanted to emphasize distance attenuation
+        # Distance attenuation
         safeDistance = max(instrument.rho, globals.MIN_DISTANCE)
-        gain = globals.volume * globals.VOL_CAP / safeDistance**2
+        gain = globals.volume * globals.VOL_CAP / safeDistance
         audioChunk = audioChunk * gain
         
         left, right = instrument.convolver.process(audioChunk)

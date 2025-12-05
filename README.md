@@ -4,7 +4,7 @@
 - Hear the instruments with spatial audio that updates in real-time
 - See sprites that visually represent the spatial position of the instruments
 
-**Video Demo:** WIP
+[![Video Demo](https://img.youtube.com/vi/a_usY8hawPc/hqdefault.jpg)](https://www.youtube.com/watch?v=a_usY8hawPc)
 
 ## Installation
 
@@ -50,5 +50,11 @@ python main.py
 I would like to thank my 15-112 instructor and teaching assistants for their guidance and support throughout this project.
 
 Parts of the code that were outside of my scope were written with the assistance of AI tools such as [ChatGPT](https://chatgpt.com/) and [Claude](https://claude.ai/). All final implementations and testing were completed by me.
+
+The HRTF Database used was [The Viking HRTF Database](https://sofacoustics.org/data/database/viking/documentation.pdf).
+
+- Note that this database does not cover points under an elevation of -45 degrees, and so instruments placed under that threshold will not be accurate
+
+Instrument sounds were created using [GarageBand](https://apps.apple.com/us/app/garageband/id408709785) Smart Strings.
 
 GUI was heavily inspired by [xLogicCircuits](https://math.hws.edu/eck/js/xLogicCircuits/xLogicCircuits.html).

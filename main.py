@@ -3,6 +3,7 @@ from tracking import initializeTracking, updateTracking
 from sound import initializeAudio, updateSources
 from gui import GUI
 import globals
+import numpy as np
 
 def main():
     root = tk.Tk()
@@ -20,7 +21,7 @@ def main():
         gui.updateInfo()
         
         root.after(33, updateLoop)
-    
+
     updateLoop()
     root.mainloop()
     
