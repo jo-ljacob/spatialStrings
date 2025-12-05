@@ -4,7 +4,7 @@
 - Hear the instruments with spatial audio that updates in real-time
 - See sprites that visually represent the spatial position of the instruments
 
-**Video Demo:**
+**Video Demo:**<br>
 
 [![Video Demo](https://img.youtube.com/vi/a_usY8hawPc/hqdefault.jpg)](https://www.youtube.com/watch?v=a_usY8hawPc)
 
