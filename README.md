@@ -5,6 +5,7 @@
 - See sprites that visually represent the spatial position of the instruments
 
 **Video Demo:**
+
 [![Video Demo](https://img.youtube.com/vi/a_usY8hawPc/hqdefault.jpg)](https://www.youtube.com/watch?v=a_usY8hawPc)
 
 ## Installation
